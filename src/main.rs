@@ -97,9 +97,6 @@ fn openWaveFile(file_path: &str) -> Vec<f64> {
             resampled_samples_f32.push(channel_resampled_data[channel][i]);
         }
     }
-
-    //print length of resampled samples
-    println!("Length of resampled samples: {}", resampled_samples_f32.len());
     return resampled_samples_f32;
 }
 
@@ -125,8 +122,7 @@ fn write_wav_file(file_path: &str, samples: Vec<i32>, sample_rate: u32, bit_dept
     for sample in samples {
         writer.write_sample(sample).unwrap();
     }
-    let end_time = Instant::now();
-    println!(" time taken in writing wavfile: {:?}", end_time.duration_since(start_time));
+
 }
 
 /**
@@ -146,7 +142,6 @@ fn process_files(files: Vec<&str>) -> Vec<i32>
         let filename = file.split('/').last().unwrap().split('.').next().unwrap().to_string();
         files_data.insert(filename.clone(), openWaveFile(file));
         files_length.insert(filename.clone(), files_data.get(&filename).unwrap().len() as i32);
-        println!("{:?}", files_length.get(&filename).unwrap());
     }
 
     // Determine the longest file and pad the shorter files with zeros
