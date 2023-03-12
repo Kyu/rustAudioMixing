@@ -4,6 +4,11 @@ use std::f32::consts::PI;
 use hound::{SampleFormat, WavSpec, WavWriter};
 use std::collections::HashMap;
 
+/**
+ * This function opens a WAV file and returns a vector of samples
+ * @param filePath - the path to the WAV file
+ * @return a vector of samples
+ */
 fn openWaveFile(filePath: &str) -> Vec<i16> {
     // open the WAV file
     let file = match hound::WavReader::open(filePath) {
@@ -23,6 +28,14 @@ fn openWaveFile(filePath: &str) -> Vec<i16> {
     return samples;
 }
 
+/**
+ * This function writes a vector of samples to a WAV file
+ * @param filePath - the path to the WAV file
+ * @param samples - a vector of samples
+ * @param sample_rate - the sample rate of the WAV file
+ * @param bit_depth - the bit depth of the WAV file
+ * @param num_channels - the number of channels of the WAV file
+ */
 fn writeWavFile(filePath: &str, samples: Vec<i16>, sample_rate: u32, bit_depth: u16, num_channels: u16) {
     // create a new WAV file
     let mut writer = WavWriter::create(filePath, WavSpec {
@@ -38,23 +51,26 @@ fn writeWavFile(filePath: &str, samples: Vec<i16>, sample_rate: u32, bit_depth: 
     }
 }
 
-fn main() {
-    // add file path here
-    let files = vec!["src/test.wav","src/test3.wav", "src/test2.wav"];
-
+/**
+ * This function takes a vector of WAV files and combines them into a single WAV file
+ * @param files - a vector of WAV file paths
+ * @return a vector of samples
+ */
+fn process_files(files: Vec<&str>) -> Vec<i16>
+{
     //create hashmap to store samples with file name as keys
     let mut filesData: HashMap<String, Vec<i16>> = HashMap::new();
     let mut filesLength: HashMap<String, i32> = HashMap::new();
 
-
-    //loop over files to store in hashmap (here we assume all formats of wavfiles are same except length of data)
+    // Read each file and store its data in a HashMap along with its length
     for file in files {
-        filesData.insert((file.split('/').last().unwrap().split('.').next().unwrap()).to_string(), openWaveFile(file));
-        filesLength.insert((file.split('/').last().unwrap().split('.').next().unwrap()).to_string(), filesData.get(&((file.split('/').last().unwrap().split('.').next().unwrap()).to_string())).unwrap().len() as i32);
-        println!("{:?}", filesLength.get(&((file.split('/').last().unwrap().split('.').next().unwrap()).to_string())).unwrap());
+        let filename = file.split('/').last().unwrap().split('.').next().unwrap().to_string();
+        filesData.insert(filename.clone(), openWaveFile(file));
+        filesLength.insert(filename.clone(), filesData.get(&filename).unwrap().len() as i32);
+        println!("{:?}", filesLength.get(&filename).unwrap());
     }
 
-    //loop over files and get longest length and file name. Then add zeros to the end of the other short files and replace the samples in the hashmap
+    // Determine the longest file and pad the shorter files with zeros
     let mut longestLength = 0;
     let mut longestFile = "".to_string();
     for (key, value) in filesLength.iter() {
@@ -75,7 +91,7 @@ fn main() {
         }
     }
 
-    // creating a output vector that adds all the samples together and divide by the number of files
+    // Combine the samples from each file and calculate the average
     let mut samples = filesData.get(&longestFile).unwrap().to_vec();
     for (key, value) in filesData.iter() {
         if key != &longestFile {
@@ -86,7 +102,14 @@ fn main() {
             }
         }
     }
+    samples
+}
+
+
+fn main() {
+    // add file path here
+    let files = vec!["src/test.wav", "src/test3.wav", "src/test2.wav"];
 
     //write samples to new file
-    writeWavFile("src/out.wav", samples, 48000, 16, 1);
+    writeWavFile("src/out.wav", process_files(files), 48000, 16, 1);
 }
