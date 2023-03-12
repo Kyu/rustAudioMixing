@@ -17,7 +17,7 @@ use rubato::{Resampler, SincFixedIn, InterpolationType, InterpolationParameters,
  * @param file_path - the path to the WAV file
  * @return a vector of samples
  */
-fn openWaveFile(file_path: &str) -> Vec<f32> {
+fn openWaveFile(file_path: &str) -> Vec<f64> {
     // open the WAV file
     let file = match hound::WavReader::open(file_path) {
         Ok(f) => f,
@@ -30,6 +30,8 @@ fn openWaveFile(file_path: &str) -> Vec<f32> {
     let sample_rate = spec.sample_rate;
     let bit_depth = spec.bits_per_sample;
     let max_sample_value = (2.0_f64.powi(bit_depth as i32 - 1) - 1.0) as i32;
+    let num_samples = file.duration() as usize;
+
 
     // parameters for the resampler
     let params = InterpolationParameters {
@@ -45,13 +47,14 @@ fn openWaveFile(file_path: &str) -> Vec<f32> {
         44100 as f64 / sample_rate as f64,
         2.0,
         params,
-        2048,
+        num_samples,
         2,
     ).unwrap();
 
 
     // If the audio is mono, treat it as stereo by duplicating the single channel
-    let mut channel_data: Vec<Vec<f32>> = vec![Vec::new(); 2];
+
+    let mut channel_data: Vec<Vec<f64>> = vec![Vec::new(); if spec.channels == 1 { 2 } else { spec.channels as usize }];
     if num_channels == 1 {
         let mut mono_samples = file.into_samples::<i32>();
         // normalize the samples in the mono channel in the range [-1.0, 1.0]
@@ -60,8 +63,8 @@ fn openWaveFile(file_path: &str) -> Vec<f32> {
                 Ok(v) => v,
                 Err(e) => panic!("Failed to read sample: {}", e),
             };
-            channel_data[0].push((value as f32 / max_sample_value as f32) as f32);
-            channel_data[1].push((value as f32 / max_sample_value as f32) as f32);
+            channel_data[0].push((value as f64 / max_sample_value as f64) as f64);
+            channel_data[1].push((value as f64 / max_sample_value as f64) as f64);
         }
     } else {
         // Read the sample data as an iterator of interleaved samples
@@ -77,14 +80,21 @@ fn openWaveFile(file_path: &str) -> Vec<f32> {
                 Ok(v) => v,
                 Err(e) => panic!("Failed to read sample: {}", e),
             };
-            channel_data[channel].push((value as f32 / max_sample_value as f32) as f32);
+            channel_data[channel].push((value as f64 / max_sample_value as f64) as f64);
         }
     }
+
+    // if sample rate is not 44100, resample the audio
+    let mut channel_resampled_data = channel_data.clone();
+    if sample_rate != 44100 {
+        channel_resampled_data = resampler.process(&channel_data, None).unwrap();
+    }
+
     // Convert the channel data vector into a single vector of interleaved samples
     let mut resampled_samples_f32 = Vec::new();
-    for i in 0..channel_data[0].len() {
-        for channel in 0..num_channels {
-            resampled_samples_f32.push(channel_data[channel][i]);
+    for i in 0..channel_resampled_data[0].len() {
+        for channel in 0..if spec.channels == 1 { 2 } else { spec.channels as usize } {
+            resampled_samples_f32.push(channel_resampled_data[channel][i]);
         }
     }
 
@@ -128,7 +138,7 @@ fn process_files(files: Vec<&str>) -> Vec<i32>
 {
     let start_time = Instant::now();
     //create hashmap to store samples with file name as keys
-    let mut files_data: HashMap<String, Vec<f32>> = HashMap::new();
+    let mut files_data: HashMap<String, Vec<f64>> = HashMap::new();
     let mut files_length: HashMap<String, i32> = HashMap::new();
 
     // Read each file and store its data in a HashMap along with its length
@@ -166,28 +176,22 @@ fn process_files(files: Vec<&str>) -> Vec<i32>
         if key != &longest_file {
             let mut i = 0;
             while i < value.len() {
-                samples[i] = ((samples[i] + value[i]) * 8388607.0) as f32;
-                // prevent clipping by limiting the sample to 24 bits
-                if samples[i] > 8388607.0 {
-                    samples[i] = 8388580.0;
-                } else if samples[i] < -8388608.0 {
-                    samples[i] = -8388580.0;
-                }
-                i += 1;
-            }
-        } else {
-            let mut i = 0;
-            while i < value.len() {
-                samples[i] = (samples[i] * 8388607.0) as f32;
-                // prevent clipping by limiting the sample to 24 bits
-                if samples[i] > 8388607.0 {
-                    samples[i] = 8388580.0;
-                } else if samples[i] < -8388608.0 {
-                    samples[i] = -8388580.0;
-                }
+                samples[i] = samples[i] + value[i];
                 i += 1;
             }
         }
+    }
+    // multiply by max sample value to normalize loudness
+    let mut i = 0;
+    while i < samples.len() {
+        samples[i] = (samples[i] * 8388607.0) as f64;
+        if samples[i] > 8388607.0 {
+            samples[i] = 8388580.0;
+        }
+        if samples[i] < -8388607.0 {
+            samples[i] = -8388580.0;
+        }
+        i += 1;
     }
     let end_time = Instant::now();
     println!(" time taken in processing: {:?}", end_time.duration_since(start_time));
@@ -196,9 +200,8 @@ fn process_files(files: Vec<&str>) -> Vec<i32>
 
 fn main() {
     // add file path here
-    // let files = vec!["src/organ_EM_120.wav", "src/test.wav", "src/perc_AM_120.wav", "src/piano_AM_120.wav", "src/riser_AM_120.wav", "src/shakers_AM_120.wav", "src/synth_AM_120.wav"];
-    let files = vec!["src/test.wav"];
+    let files = vec!["src/organ_EM_120.wav", "src/test.wav", "src/perc_AM_120.wav", "src/piano_AM_120.wav", "src/riser_AM_120.wav", "src/shakers_AM_120.wav", "src/synth_AM_120.wav"];
 
     //write samples to new file
-    write_wav_file("src/out.wav", process_files(files), 24000, 24, 2);
+    write_wav_file("src/out.wav", process_files(files), 44100, 24, 2);
 }
