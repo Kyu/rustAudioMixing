@@ -5,6 +5,7 @@ use hound::{SampleFormat, WavSpec, WavWriter};
 use std::collections::HashMap;
 use std::time::Instant;
 use rubato::{Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction};
+use rayon::prelude::*;
 
 /**
  * This function opens a WAV file and returns a vector of samples
@@ -124,14 +125,18 @@ fn process_files(files: Vec<&str>) -> Vec<i32> {
     let mut files_data: HashMap<String, Vec<f64>> = HashMap::new();
     let mut files_length: HashMap<String, i32> = HashMap::new();
 
-    // Read each file and store its data in a HashMap along with its length
-    for file in files {
-        let filename = file.split('/').last().unwrap().split('.').next().unwrap().to_owned();
-        let data = open_wave_file(file);
-        let data_length = data.len() as i32;
-        files_data.insert(filename.clone(), data);
-        files_length.insert(filename, data_length);
-    }
+    // Read each file and store its data in a HashMap along with its length in a separate HashMap in multiple threads
+    let mut files_data: HashMap<String, Vec<f64>> = files.par_iter()
+        .map(|file| {
+            let filename = file.split('/').last().unwrap().split('.').next().unwrap().to_owned();
+            let data = open_wave_file(file);
+            (filename, data)
+        })
+        .collect();
+
+    let mut files_length: HashMap<String, i32> = files_data.par_iter()
+        .map(|(filename, data)| (filename.clone(), data.len() as i32))
+        .collect();
 
     // Determine the longest file and pad the shorter files with zeros
     let longest_file = files_length.iter().max_by_key(|(_, &length)| length).unwrap().0;
