@@ -122,7 +122,6 @@ fn write_wav_file(file_path: &str, samples: Vec<i32>, sample_rate: u32, bit_dept
     for sample in samples {
         writer.write_sample(sample).unwrap();
     }
-
 }
 
 /**
@@ -130,8 +129,69 @@ fn write_wav_file(file_path: &str, samples: Vec<i32>, sample_rate: u32, bit_dept
  * @param files - a vector of WAV file paths
  * @return a vector of samples
  */
-fn process_files(files: Vec<&str>) -> Vec<i32>
-{
+// fn process_files(files: Vec<&str>) -> Vec<i32>
+// {
+//     let start_time = Instant::now();
+//     //create hashmap to store samples with file name as keys
+//     let mut files_data: HashMap<String, Vec<f64>> = HashMap::new();
+//     let mut files_length: HashMap<String, i32> = HashMap::new();
+//
+//     // Read each file and store its data in a HashMap along with its length
+//     for file in files {
+//         let filename = file.split('/').last().unwrap().split('.').next().unwrap().to_string();
+//         files_data.insert(filename.clone(), openWaveFile(file));
+//         files_length.insert(filename.clone(), files_data.get(&filename).unwrap().len() as i32);
+//     }
+//
+//     // Determine the longest file and pad the shorter files with zeros
+//     let mut longest_length = 0;
+//     let mut longest_file = "".to_string();
+//     for (key, value) in files_length.iter() {
+//         if *value > longest_length {
+//             longest_length = *value;
+//             longest_file = key.to_string();
+//         }
+//     }
+//     for (key, value) in files_length.iter() {
+//         if *value < longest_length {
+//             let mut samples = files_data.get(&key.to_string()).unwrap().to_vec();
+//             let mut i = 0;
+//             while i < longest_length - *value {
+//                 samples.push(0.0);
+//                 i += 1;
+//             }
+//             files_data.insert(key.to_string(), samples);
+//         }
+//     }
+//
+//     // Combine the samples from each file and calculate the average and normalize the loudness
+//     let mut samples = files_data.get(&longest_file).unwrap().to_vec();
+//     for (key, value) in files_data.iter() {
+//         if key != &longest_file {
+//             let mut i = 0;
+//             while i < value.len() {
+//                 samples[i] = samples[i] + value[i];
+//                 i += 1;
+//             }
+//         }
+//     }
+//     // multiply by max sample value to normalize loudness
+//     let mut i = 0;
+//     while i < samples.len() {
+//         samples[i] = (samples[i] * 8388607.0) as f64;
+//         if samples[i] > 8388607.0 {
+//             samples[i] = 8388580.0;
+//         }
+//         if samples[i] < -8388607.0 {
+//             samples[i] = -8388580.0;
+//         }
+//         i += 1;
+//     }
+//     let end_time = Instant::now();
+//     println!(" time taken in processing: {:?}", end_time.duration_since(start_time));
+//     samples.iter().map(|&s| s as i32).collect()
+// }
+fn process_files(files: Vec<&str>) -> Vec<i32> {
     let start_time = Instant::now();
     //create hashmap to store samples with file name as keys
     let mut files_data: HashMap<String, Vec<f64>> = HashMap::new();
@@ -139,59 +199,40 @@ fn process_files(files: Vec<&str>) -> Vec<i32>
 
     // Read each file and store its data in a HashMap along with its length
     for file in files {
-        let filename = file.split('/').last().unwrap().split('.').next().unwrap().to_string();
-        files_data.insert(filename.clone(), openWaveFile(file));
-        files_length.insert(filename.clone(), files_data.get(&filename).unwrap().len() as i32);
+        let filename = file.split('/').last().unwrap().split('.').next().unwrap().to_owned();
+        let data = openWaveFile(file);
+        let data_length = data.len() as i32;
+        files_data.insert(filename.clone(), data);
+        files_length.insert(filename, data_length);
     }
 
     // Determine the longest file and pad the shorter files with zeros
-    let mut longest_length = 0;
-    let mut longest_file = "".to_string();
-    for (key, value) in files_length.iter() {
-        if *value > longest_length {
-            longest_length = *value;
-            longest_file = key.to_string();
-        }
-    }
-    for (key, value) in files_length.iter() {
-        if *value < longest_length {
-            let mut samples = files_data.get(&key.to_string()).unwrap().to_vec();
-            let mut i = 0;
-            while i < longest_length - *value {
-                samples.push(0.0);
-                i += 1;
-            }
-            files_data.insert(key.to_string(), samples);
+    let longest_file = files_length.iter().max_by_key(|(_, &length)| length).unwrap().0;
+    let longest_length = files_length.get(longest_file).unwrap();
+    for (key, value) in &mut files_data {
+        if key != longest_file {
+            let padding = vec![0.0; (longest_length - value.len() as i32) as usize];
+            value.extend_from_slice(&padding);
         }
     }
 
     // Combine the samples from each file and calculate the average and normalize the loudness
-    let mut samples = files_data.get(&longest_file).unwrap().to_vec();
-    for (key, value) in files_data.iter() {
-        if key != &longest_file {
-            let mut i = 0;
-            while i < value.len() {
-                samples[i] = samples[i] + value[i];
-                i += 1;
-            }
+    let mut samples = files_data.remove(longest_file).unwrap();
+    for (_, value) in &files_data {
+        for (s1, s2) in samples.iter_mut().zip(value.iter()) {
+            *s1 += *s2;
         }
     }
     // multiply by max sample value to normalize loudness
-    let mut i = 0;
-    while i < samples.len() {
-        samples[i] = (samples[i] * 8388607.0) as f64;
-        if samples[i] > 8388607.0 {
-            samples[i] = 8388580.0;
-        }
-        if samples[i] < -8388607.0 {
-            samples[i] = -8388580.0;
-        }
-        i += 1;
+    for s in &mut samples {
+        *s = (*s * 8388607.0).max(-8388580.0).min(8388580.0);
     }
+
     let end_time = Instant::now();
-    println!(" time taken in processing: {:?}", end_time.duration_since(start_time));
+    println!("time taken in processing: {:?}", end_time.duration_since(start_time));
     samples.iter().map(|&s| s as i32).collect()
 }
+
 
 fn main() {
     // add file path here
