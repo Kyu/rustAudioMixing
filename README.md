@@ -1,6 +1,6 @@
-### Audio Resampler
+### Audio Resampler & Mixer
 
-This is a Rust program that resamples audio files (mono or stereo) to a fixed sample rate of 44100 Hz stereo. The resampling is performed using the rubato crate which provides high-quality resampling using a variety of resampling algorithms.
+This is a Rust program that resamples audio files (mono or stereo) to a fixed sample rate of 44100 Hz stereo and mix it. The resampling is performed using the rubato crate which provides high-quality resampling using a variety of resampling algorithms.
 
 ## Usage
 
