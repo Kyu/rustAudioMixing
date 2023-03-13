@@ -1,10 +1,8 @@
 extern crate hound;
 extern crate rubato;
 
-use std::f32::consts::PI;
 use hound::{SampleFormat, WavSpec, WavWriter};
 use std::collections::HashMap;
-use std::any::type_name;
 use std::time::Instant;
 use rubato::{Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction};
 
@@ -13,7 +11,7 @@ use rubato::{Resampler, SincFixedIn, InterpolationType, InterpolationParameters,
  * @param file_path - the path to the WAV file
  * @return a vector of samples
  */
-fn openWaveFile(file_path: &str) -> Vec<f64> {
+fn open_wave_file(file_path: &str) -> Vec<f64> {
     // open the WAV file
     let file = match hound::WavReader::open(file_path) {
         Ok(f) => f,
@@ -29,10 +27,9 @@ fn openWaveFile(file_path: &str) -> Vec<f64> {
     let num_samples = file.duration() as usize;
 
     // If the audio is mono, treat it as stereo by duplicating the single channel
-
     let mut channel_data: Vec<Vec<f64>> = vec![Vec::new(); if spec.channels == 1 { 2 } else { spec.channels as usize }];
     if num_channels == 1 {
-        let mut mono_samples = file.into_samples::<i32>();
+        let mono_samples = file.into_samples::<i32>();
         // normalize the samples in the mono channel in the range [-1.0, 1.0]
         for sample in mono_samples {
             let value = match sample {
@@ -84,13 +81,13 @@ fn openWaveFile(file_path: &str) -> Vec<f64> {
     }
 
     // Convert the channel data vector into a single vector of interleaved samples
-    let mut resampled_samples_f32 = Vec::new();
+    let mut resampled_samples_f64 = Vec::new();
     for i in 0..channel_resampled_data[0].len() {
         for channel in 0..if spec.channels == 1 { 2 } else { spec.channels as usize } {
-            resampled_samples_f32.push(channel_resampled_data[channel][i]);
+            resampled_samples_f64.push(channel_resampled_data[channel][i]);
         }
     }
-    return resampled_samples_f32;
+    resampled_samples_f64
 }
 
 /**
@@ -103,10 +100,9 @@ fn openWaveFile(file_path: &str) -> Vec<f64> {
  */
 fn write_wav_file(file_path: &str, samples: Vec<i32>, sample_rate: u32, bit_depth: u16, num_channels: u16) {
     // create a new WAV file
-    let start_time = Instant::now();
     let mut writer = WavWriter::create(file_path, WavSpec {
         channels: num_channels,
-        sample_rate: sample_rate,
+        sample_rate,
         bits_per_sample: bit_depth,
         sample_format: SampleFormat::Int,
     }).unwrap();
@@ -131,7 +127,7 @@ fn process_files(files: Vec<&str>) -> Vec<i32> {
     // Read each file and store its data in a HashMap along with its length
     for file in files {
         let filename = file.split('/').last().unwrap().split('.').next().unwrap().to_owned();
-        let data = openWaveFile(file);
+        let data = open_wave_file(file);
         let data_length = data.len() as i32;
         files_data.insert(filename.clone(), data);
         files_length.insert(filename, data_length);
