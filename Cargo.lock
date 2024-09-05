@@ -3,6 +3,15 @@
 version = 3
 
 [[package]]
+name = "audio-resampler"
+version = "0.1.0"
+dependencies = [
+ "hound",
+ "rayon",
+ "rubato",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -218,15 +227,6 @@ checksum = "e6522d49d03727ffb138ae4cbc1283d3774f0d10aa7f9bf52e6784c45daf9b23"
 dependencies = [
  "num-integer",
  "strength_reduce",
-]
-
-[[package]]
-name = "untitled"
-version = "0.1.0"
-dependencies = [
- "hound",
- "rayon",
- "rubato",
 ]
 
 [[package]]
