@@ -37,8 +37,8 @@ fn open_wave_file(file_path: &str) -> Vec<f64> {
                 Ok(v) => v,
                 Err(e) => panic!("Failed to read sample: {}", e),
             };
-            channel_data[0].push((value as f64 / max_sample_value as f64) as f64);
-            channel_data[1].push((value as f64 / max_sample_value as f64) as f64);
+            channel_data[0].push(value as f64 / max_sample_value as f64);
+            channel_data[1].push(value as f64 / max_sample_value as f64);
         }
     } else {
         // Read the sample data as an iterator of interleaved samples
@@ -54,7 +54,7 @@ fn open_wave_file(file_path: &str) -> Vec<f64> {
                 Ok(v) => v,
                 Err(e) => panic!("Failed to read sample: {}", e),
             };
-            channel_data[channel].push((value as f64 / max_sample_value as f64) as f64);
+            channel_data[channel].push(value as f64 / max_sample_value as f64);
         }
     }
 
@@ -72,7 +72,7 @@ fn open_wave_file(file_path: &str) -> Vec<f64> {
 
         // create a resampler that converts the sample rate to 44100
         let mut resampler = SincFixedIn::<f64>::new(
-            44100 as f64 / sample_rate as f64,
+            44100f64 / sample_rate as f64,
             2.0,
             params,
             num_samples,
@@ -121,9 +121,6 @@ fn write_wav_file(file_path: &str, samples: Vec<i32>, sample_rate: u32, bit_dept
  */
 fn process_files(files: Vec<&str>) -> Vec<i32> {
     let start_time = Instant::now();
-    //create hashmap to store samples with file name as keys
-    let mut files_data: HashMap<String, Vec<f64>> = HashMap::new();
-    let mut files_length: HashMap<String, i32> = HashMap::new();
 
     // Read each file and store its data in a HashMap along with its length in a separate HashMap in multiple threads
     let mut files_data: HashMap<String, Vec<f64>> = files.par_iter()
@@ -134,7 +131,7 @@ fn process_files(files: Vec<&str>) -> Vec<i32> {
         })
         .collect();
 
-    let mut files_length: HashMap<String, i32> = files_data.par_iter()
+    let files_length: HashMap<String, i32> = files_data.par_iter()
         .map(|(filename, data)| (filename.clone(), data.len() as i32))
         .collect();
 
@@ -168,8 +165,8 @@ fn process_files(files: Vec<&str>) -> Vec<i32> {
 
 fn main() {
     // add file path here
-    let files = vec!["src/organ_EM_120.wav", "src/test.wav", "src/perc_AM_120.wav", "src/piano_AM_120.wav", "src/riser_AM_120.wav", "src/shakers_AM_120.wav", "src/synth_AM_120.wav"];
+    let files = vec!["samples/organ_EM_120.wav", "samples/test.wav", "samples/perc_AM_120.wav", "samples/piano_AM_120.wav", "samples/riser_AM_120.wav", "samples/shakers_AM_120.wav", "samples/synth_AM_120.wav"];
 
     //write samples to new file
-    write_wav_file("src/out.wav", process_files(files), 44100, 24, 2);
+    write_wav_file("out.wav", process_files(files), 44100, 24, 2);
 }
